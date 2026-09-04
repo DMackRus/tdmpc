@@ -5,8 +5,8 @@ os.environ['MKL_SERVICE_FORCE_INTEL'] = '1'
 os.environ['MUJOCO_GL'] = 'egl'
 import torch
 import numpy as np
-import gym
-gym.logger.set_level(40)
+import gymnasium as gym
+gym.logger.min_level = gym.logger.ERROR
 import time
 import random
 from pathlib import Path

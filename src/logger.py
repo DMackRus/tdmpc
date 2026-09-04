@@ -51,9 +51,10 @@ def cfg_to_group(cfg, return_list=False):
 
 
 class VideoRecorder:
-	"""Utility class for logging evaluation videos."""
+	"""Utility class for saving evaluation rollout videos (locally and, if
+	available, to wandb)."""
 	def __init__(self, root_dir, wandb, render_size=384, fps=15):
-		self.save_dir = (root_dir / 'eval_video') if root_dir else None
+		self.save_dir = make_dir(root_dir / 'eval_video') if root_dir else None
 		self._wandb = wandb
 		self.render_size = render_size
 		self.fps = fps
@@ -62,7 +63,7 @@ class VideoRecorder:
 
 	def init(self, env, enabled=True):
 		self.frames = []
-		self.enabled = self.save_dir and self._wandb and enabled
+		self.enabled = bool(self.save_dir) and enabled
 		self.record(env)
 
 	def record(self, env):
@@ -71,9 +72,19 @@ class VideoRecorder:
 			self.frames.append(frame)
 
 	def save(self, step):
-		if self.enabled:
-			frames = np.stack(self.frames).transpose(0, 3, 1, 2)
-			self._wandb.log({'eval_video': self._wandb.Video(frames, fps=self.fps, format='mp4')}, step=step)
+		if self.enabled and len(self.frames) > 0:
+			frames = np.stack(self.frames)
+			path = self.save_dir / f'{int(step):07d}.mp4'
+			try:
+				import imageio
+				imageio.mimsave(path, frames, fps=self.fps, macro_block_size=1)
+				print(colored(f'Saved evaluation video to {path}', 'green'))
+			except Exception as e:
+				print(colored(f'Warning: failed to save eval video ({e}).', 'yellow'))
+			if self._wandb is not None:
+				self._wandb.log(
+					{'eval_video': self._wandb.Video(frames.transpose(0, 3, 1, 2), fps=self.fps, format='mp4')},
+					step=step)
 
 
 class Logger(object):
@@ -108,7 +119,7 @@ class Logger(object):
 			except:
 				print(colored('Warning: failed to init wandb. Logs will be saved locally.', 'yellow'), attrs=['bold'])
 				self._wandb = None
-		self._video = VideoRecorder(log_dir, self._wandb) if self._wandb and cfg.save_video else None
+		self._video = VideoRecorder(log_dir, self._wandb) if cfg.save_video else None
 
 	@property
 	def video(self):

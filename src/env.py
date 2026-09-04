@@ -5,7 +5,7 @@ import numpy as np
 from dm_control import suite
 from dm_control.suite.wrappers import action_scale, pixels
 from dm_env import StepType, specs
-import gym
+import gymnasium as gym
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning) 
 
@@ -242,13 +242,20 @@ class TimeStepToGymWrapper(object):
 		return self.env.physics.render(height, width, camera_id)
 
 
-class DefaultDictWrapper(gym.Wrapper):
+# NOTE: gymnasium's `gym.Wrapper` requires the wrapped env to be a
+# `gymnasium.Env` (and imposes the 5-tuple step API). `TimeStepToGymWrapper`
+# is a plain object exposing the classic 4-tuple API, so this stays a simple
+# pass-through wrapper that delegates everything it does not override.
+class DefaultDictWrapper:
 	def __init__(self, env):
-		gym.Wrapper.__init__(self, env)
+		self.env = env
 
 	def step(self, action):
 		obs, reward, done, info = self.env.step(action)
 		return obs, reward, done, defaultdict(float, info)
+
+	def __getattr__(self, name):
+		return getattr(self.env, name)
 
 
 def make_env(cfg):
